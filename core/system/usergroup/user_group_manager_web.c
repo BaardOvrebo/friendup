@@ -581,7 +581,7 @@ Http *UMGWebRequest( void *m, char **urlpath, Http* request, UserSession *logged
 						{
 							DEBUG("Remove users from group\n");
 							char tmpQuery[ 512 ];
-							snprintf( tmpQuery, sizeof(tmpQuery), "SELECT ug.UserID FROM FUserToGroup ug WHERE ug.GroupID=%lu", groupID );
+							snprintf( tmpQuery, sizeof(tmpQuery), "SELECT UserID FROM FUserToGroup WHERE UserGroupID=%lu", groupID );
 							void *result = sqlLib->Query(  sqlLib, tmpQuery );
 							if( result != NULL )
 							{
@@ -604,7 +604,7 @@ Http *UMGWebRequest( void *m, char **urlpath, Http* request, UserSession *logged
 							}
 							
 							// remove connections between users and group
-							snprintf( tmpQuery, sizeof(tmpQuery), "delete FROM FUserToGroup ug WHERE ug.GroupID=%lu", groupID );
+							snprintf( tmpQuery, sizeof(tmpQuery), "delete FROM FUserToGroup WHERE UserGroupID=%lu", groupID );
 							sqlLib->QueryWithoutResults(  sqlLib, tmpQuery );
 							
 							l->LibrarySQLDrop( l, sqlLib );
@@ -635,7 +635,7 @@ Http *UMGWebRequest( void *m, char **urlpath, Http* request, UserSession *logged
 					}
 					
 					char msg[ 512 ];
-					snprintf( msg, sizeof(msg), "{\"id\":%lu,\"name\":\"%s\",\"type\",\"%s\"}", fg->ug_ID, fg->ug_Name, fg->ug_Type );
+					snprintf( msg, sizeof(msg), "{\"id\":%lu,\"name\":\"%s\",\"type\":\"%s\"}", fg->ug_ID, fg->ug_Name, fg->ug_Type );
 					NotificationManagerSendEventToConnections( l->sl_NotificationManager, request, NULL, "service", "group", "update", msg );
 
 					char buffer[ 256 ];
@@ -852,8 +852,8 @@ Http *UMGWebRequest( void *m, char **urlpath, Http* request, UserSession *logged
 				SQLLibrary *sqlLib = l->LibrarySQLGet( l );
 				if( sqlLib != NULL )
 				{
-					char tmpQuery[ 512 ];
-					snprintf( tmpQuery, sizeof(tmpQuery), "SELECT u.ID,u.UniqueID FROM FUserToGroup ug inner join FUser u on ug.UserID=u.ID WHERE ug.UserGroupID=%lu group by ug.UserID", groupID );
+					char tmpQuery[ 768 ];
+					snprintf( tmpQuery, sizeof(tmpQuery), "SELECT u.ID,u.UniqueID,u.Name,u.FullName FROM FUserToGroup ug inner join FUser u on ug.UserID=u.ID WHERE ug.UserGroupID=%lu group by ug.UserID", groupID );
 					void *result = sqlLib->Query(  sqlLib, tmpQuery );
 					if( result != NULL )
 					{
@@ -867,11 +867,11 @@ Http *UMGWebRequest( void *m, char **urlpath, Http* request, UserSession *logged
 							
 							if( pos == 0 )
 							{
-								itmp = snprintf( tmp, sizeof(tmp), "{\"id\":%lu,\"uuid\":\"%s\"}", userid, (char *)row[ 1 ] );
+								itmp = snprintf( tmp, sizeof(tmp), "{\"id\":%lu,\"uuid\":\"%s\",\"name\":\"%s\",\"fullname\":\"%s\"}", userid, (char *)row[ 1 ], (char *)row[ 2 ], (char *)row[ 3 ] );
 							}
 							else
 							{
-								itmp = snprintf( tmp, sizeof(tmp), ",{\"id\":%lu,\"uuid\":\"%s\"}", userid, (char *)row[ 1 ] );
+								itmp = snprintf( tmp, sizeof(tmp), ",{\"id\":%lu,\"uuid\":\"%s\",\"name\":\"%s\",\"fullname\":\"%s\"}", userid, (char *)row[ 1 ], (char *)row[ 2 ], (char *)row[ 3 ] );
 							}
 							BufStringAddSize( retString, tmp, itmp );
 							pos++;
@@ -957,7 +957,7 @@ Http *UMGWebRequest( void *m, char **urlpath, Http* request, UserSession *logged
 				int itmp = 0;
 				ug = UGMGetGroupByID( l->sl_UGM, groupID );
 				
-				itmp = snprintf( tmp, sizeof(tmp), "\"groupid\":%lu,\"usersids\":[", groupID );
+				itmp = snprintf( tmp, sizeof(tmp), "\"groupid\":%lu,\"userids\":[", groupID );
 				BufStringAddSize( retString, tmp, itmp );
 				
 				if( ug != NULL )
@@ -1120,7 +1120,7 @@ Http *UMGWebRequest( void *m, char **urlpath, Http* request, UserSession *logged
 				UserGroup *ug = NULL;
 				ug = UGMGetGroupByID( l->sl_UGM, groupID );
 				
-				itmp = snprintf( tmp, sizeof(tmp), "\"groupid\":%lu,\"usersids\":[", groupID );
+				itmp = snprintf( tmp, sizeof(tmp), "\"groupid\":%lu,\"userids\":[", groupID );
 				BufStringAddSize( retString, tmp, itmp );
 				
 				if( ug != NULL )
@@ -1201,7 +1201,7 @@ Http *UMGWebRequest( void *m, char **urlpath, Http* request, UserSession *logged
 			BufStringAddSize( retString, "]}", 2 );
 			
 			// send notification to external service
-			NotificationManagerSendEventToConnections( l->sl_NotificationManager, request, NULL, "service", "group", "removeusers", &(retString->bs_Buffer[16]) );
+			NotificationManagerSendEventToConnections( l->sl_NotificationManager, request, NULL, "service", "group", "removeusers", &(retString->bs_Buffer[17]) );
 		
 			HttpSetContent( response, retString->bs_Buffer, retString->bs_Size );
 			retString->bs_Buffer = NULL;

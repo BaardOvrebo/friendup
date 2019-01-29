@@ -41,6 +41,12 @@
 	pointer-events: all;
 }
 
+.ViewContainer.Activating > .View > .Content, 
+.ViewContainer.DelayedDeactivation > .View > .Content
+{
+	overflow: hidden !important;
+}
+
 /* Disabled for default theme */
 .ViewContainer > .ViewIcon
 {

@@ -81,7 +81,8 @@ function PollTray()
 						{
 							event.clickCallback();
 							RemoveNotificationEvent( event.notificationId );
-							tray.notifications.removeChild( this );
+							if( tray.notifications && tray.notifications.removeChild )
+								tray.notifications.removeChild( this );
 						}
 						PollTray();
 						return cancelBubble( e );
@@ -132,6 +133,7 @@ function PollTray()
 			// Clear and repopulate popup
 			function repopulate()
 			{
+				if( !tray.notificationPopup ) return;
 				tray.notificationPopup.innerHTML = '';
 			
 				var h = 8;
@@ -443,8 +445,8 @@ function Notify( message, callback, clickcallback )
 	}
 	
 	if( !message.text ) message.text = 'untexted';
-	if( !message.title ) message.title = 'untitled';
-
+	if( !message.title ) message.title = 'untitled'; 
+	
 	// The notification event
 	var nev = {
 		title: message.title,
@@ -484,7 +486,20 @@ function Notify( message, callback, clickcallback )
 		
 		var n = document.createElement( 'div' );
 		n.className = 'MobileNotification BackgroundDefault ColorDefault';
-		n.innerHTML = '<div class="Title">' + message.title + '</div><div class="Text">' + message.text + '</div>';
+		
+		var ic = '';
+		if( message.applicationIcon )
+		{
+			ic += '<img src="' + message.applicationIcon + '"/>';
+		}
+		if( message.application )
+		{
+			ic += '<span>' + message.application + '</span>';
+		}
+		if( ic.length )
+			ic = '<div class="Application">' + ic + '</div>';
+			
+		n.innerHTML = ic + '<div class="Title">' + message.title + '</div><div class="Text">' + message.text + '</div>';
 		ge( 'MobileNotifications' ).appendChild( n );
 		setTimeout( function(){ n.classList.add( 'Showing' ); }, 50 );
 		n.close = function()

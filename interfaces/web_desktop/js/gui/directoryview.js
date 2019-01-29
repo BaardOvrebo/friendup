@@ -493,6 +493,7 @@ DirectoryView.prototype.initToolbar = function( winobj )
 		if( buttons[a].element == 'toggle-group' )
 		{
 			var ele = document.createElement( 'div' );
+			buttons[a].domElement = ele;
 			ele.className = 'ToggleGroup';
 			ele.className += ' ' + buttons[a].align;
 			ele.checkActive = function( value )
@@ -685,6 +686,30 @@ DirectoryView.prototype.InitWindow = function( winobj )
 	winobj.redrawIcons = function( icons, direction, callback )
 	{
 		var dirv = this.directoryview;
+		
+		// When we have a toolbar and no file browser, remove up on root paths
+		
+		var dormantDrive = winobj.fileInfo && (
+			winobj.fileInfo.Path.indexOf( 'System:' ) == 0 ||
+			winobj.fileInfo.Dormant ||
+			( winobj.fileInfo.Door && winobj.fileInfo.Door.dormantDoor )
+		);
+		
+		if( dirv.toolbar && dormantDrive )
+		{
+			var upb = dirv.toolbar.querySelector( '.Up' );
+			if( upb )
+			{
+				if( winobj.fileInfo && winobj.fileInfo.Path.substr( winobj.fileInfo.Path.length - 1, 1 ) == ':' )
+				{
+					upb.style.display = 'none';
+				}
+				else
+				{
+					upb.style.display = '';
+				}
+			}
+		}
 		
 		// Start with a path
 		if( dirv.startPath )
@@ -980,6 +1005,7 @@ DirectoryView.prototype.InitWindow = function( winobj )
 			this.classList.remove( 'DragTarget' );
 		}
 
+		// formatted is used to handle a formatted, recursive list
 		function handleHostFileSelect( e )
 		{
 			var files = e.dataTransfer.files || e.target.files;
@@ -988,11 +1014,157 @@ DirectoryView.prototype.InitWindow = function( winobj )
 
 			e.stopPropagation();
 			e.preventDefault();
+			
+			
+			var di = winobj;
+			
+			var info = false;
+			if( files && !di.content && di.classList.contains( 'Screen' ) || di.classList.contains( 'ScreenContent' ) )
+			{
+				info = {
+					'session': Workspace.sessionId,
+					'targetPath': 'Home:Downloads/',
+					'targetVolume': 'Home:',
+					'files': files
+				};
+			}
+			else if( files && di.content && di.content.fileInfo && di.content.fileInfo.Volume )
+			{
+				info = {
+					'session': Workspace.sessionId,
+					'targetPath': di.content.fileInfo.Path,
+					'targetVolume': di.content.fileInfo.Volume,
+					'files': files
+				};
+			}
+			
+			// Try recursion!
+			// TODO: Enable again when safe!!
+			if( 1 == 2 && e.dataTransfer.items )
+			{
+				info.files = [];
+				info.queued = true;
+				
+				var num = 0;
+				var finalElements = [];
+				
+				// Wait till the elements are all counted
+				var isBusy = true;
+				var busyTimeout = null;
+				function busyChecker()
+				{
+					if( busyTimeout )
+						clearTimeout( busyTimeout );
+					busyTimeout = setTimeout( function()
+					{
+						if( isBusy )
+						{
+							isBusy = false;
+							uworker.postMessage( { 
+								recursiveUpdate: true, 
+								executeQueue: true, 
+								session: info.session, 
+								targetPath: info.targetPath, 
+								targetVolume: info.targetVolume 
+							} );
+						}
+					}, 500 );
+				}
+			
+				function toArray( list )
+				{
+					return Array.prototype.slice.call( list || [], 0 );
+				}
 
-			if( files && this.content && this.content.fileInfo && this.content.fileInfo.Volume )
+				function countItems( items )
+				{
+					for ( var i = 0, l = items.length; i < l; i++ )
+					{
+						countItem( items[ i ] );
+					}
+				}
+
+				function renderItem( itm )
+				{
+					if( itm.file )
+					{
+						itm.file( function( f )
+						{
+							uworker.postMessage( { recursiveUpdate: true, item: f, fullPath: itm.fullPath, session: Workspace.sessionId } );
+						} );
+					}
+					busyChecker();
+				}
+
+				function countEntry( entry )
+				{
+					if( entry.isDirectory )
+					{
+						var dirReader = entry.createReader();
+						var num = 0;
+						var readEntries = function()
+						{
+							dirReader.readEntries( function( results )
+							{
+								if( !results.length )
+								{
+									renderItem( entry );
+								}
+								else
+								{
+									for( var a = 0; a < results.length; a++ )
+									{
+										countEntry( results[ a ] );
+									}
+								}
+							} );
+						};
+						readEntries();
+					} 
+					else 
+					{
+						renderItem( entry, 1 );
+					}
+				}
+
+				function countItem( item )
+				{
+					var entry = item.getAsEntry || item.webkitGetAsEntry();
+					if( entry.isDirectory )
+					{
+						var dirReader = entry.createReader();
+						var num = 0;
+						var readEntries = function()
+						{
+							dirReader.readEntries( function( results )
+							{
+								if( !results.length )
+								{
+									renderItem( entry );
+								}
+								else
+								{
+									for( var a = 0; a < results.length; a++ )
+									{
+										countEntry( results[ a ] );
+									}
+								}
+							} );
+						};
+						readEntries();
+					} 
+					else 
+					{
+						renderItem( entry, 1 );
+					}
+				}
+				countItems( e.dataTransfer.items );
+			}
+
+			if( info )
 			{
 				// TODO: to detect read only filesystem!
-				if( this.content.fileInfo.Volume == 'System:' || this.content.fileInfo.Path.split( ':' )[0] == 'System' )
+				if( info.targetVolume == 'System:' || info.targetPath.split( ':' )[0] == 'System' )
 				{
 					Alert( i18n( 'i18n_read_only_filesystem' ), i18n( 'i18n_read_only_fs_desc' ) );
 					return false;
@@ -1132,8 +1304,13 @@ DirectoryView.prototype.InitWindow = function( winobj )
 						if( e.data['uploadscomplete'] == 1 )
 						{
 							w.close();
-							winobj.refresh();
+							if( winobj && winobj.refresh )
+								winobj.refresh();
 
+							Notify( { title: i18n( 'i18n_upload_completed' ), 'text':i18n('i18n_uploaded_to_downloads') }, false, function()
+							{
+								OpenWindowByFileinfo( { Title: 'Downloads', Path: 'Home:Downloads/', Type: 'Directory', MetaType: 'Directory' } );
+							} );
 							return true;
 						}
 						else if( e.data['progress'] )
@@ -1155,16 +1332,11 @@ DirectoryView.prototype.InitWindow = function( winobj )
 
 				uprogress.load();
 
-				uworker.postMessage( {
-					'session': Workspace.sessionId,
-					'targetPath': this.content.fileInfo.Path,
-					'targetVolume': this.content.fileInfo.Volume,
-					'files': files
-				} );
+				uworker.postMessage( info );
 			}
 			else
 			{
-				console.log( 'We got nothing.', this.content );
+				console.log( 'We got nothing.', this );
 			}
 		}
 
@@ -4755,9 +4927,14 @@ function CheckDoorsKeys( e )
 {
 	if ( !e ) e = window.event;
 	var k = e.which | e.keyCode;
+	var cycle = false;
 	
 	if( !Workspace.editing )
 	{
+		// No normal dirmode when editing a filename
+		var dirMode = window.regionWindow && window.regionWindow.directoryview && window.regionWindow.windowObject &&
+			( !window.regionWindow.windowObject.flags || !window.regionWindow.windowObject.flags.editing );
+		
 		switch( k )
 		{
 			// TODO: Implement confirm dialog!
@@ -4768,7 +4945,7 @@ function CheckDoorsKeys( e )
 				}
 				break;
 			case 13:
-				if( window.regionWindow && window.regionWindow.directoryview && !window.regionWindow.windowObject.flags.editing )
+				if( dirMode )
 				{
 					for( var a = 0; a < window.regionWindow.icons.length; a++ )
 					{
@@ -4783,7 +4960,7 @@ function CheckDoorsKeys( e )
 			case 86:
 				if( e.ctrlKey || e.command )
 				{
-					if( window.regionWindow && window.regionWindow.directoryview && !window.regionWindow.windowObject.flags.editing )
+					if( dirMode )
 					{
 						Workspace.pasteFiles( e );
 						return cancelBubble( e );
@@ -4793,9 +4970,9 @@ function CheckDoorsKeys( e )
 			case 67:
 				if( e.ctrlKey || e.command )
 				{
-					if( window.regionWindow && window.regionWindow.directoryview && !window.regionWindow.windowObject.flags.editing )
+					if( dirMode )
 					{
-						// Find active					
+						// Find active
 						for( var a = 0; a < window.regionWindow.icons.length; a++ )
 						{
 							if( window.regionWindow.icons[a].selected )
@@ -4808,7 +4985,11 @@ function CheckDoorsKeys( e )
 					}
 				}
 				break;
+			case 9:
+				cycle = true;
+				break;
 			default:
+				
 				break;
 		}
 	}
@@ -4816,7 +4997,7 @@ function CheckDoorsKeys( e )
 	if( 
 		!Workspace.editing &&
 		window.regionWindow && window.regionWindow.directoryview && 
-		( window.regionWindow.windowObject && !window.regionWindow.windowObject.flags.editing ) &&
+		( window.regionWindow.windowObject && ( !window.regionWindow.windowObject.flags || !window.regionWindow.windowObject.flags.editing ) ) &&
 		window.regionWindow.directoryview.keyboardNavigation &&
 		!e.ctrlKey
 	)
@@ -4824,36 +5005,73 @@ function CheckDoorsKeys( e )
 		var rw = window.regionWindow.icons;
 		if( rw )
 		{
-			var out = [];
-			var found = false;
-			for( var a = 0; a < rw.length; a++ )
+			// cycle!
+			if( cycle )
 			{
-				var f = rw[a].Title ? rw[a].Title : rw[a].Filename;
-				if( f.toUpperCase().charCodeAt(0) == k )
+				var scroll = false;
+				var found = false;
+				for( var a = 0; a < rw.length; a++ )
 				{
-					out.push( rw[a] );
-					if( rw[a].selected )
+					if( rw[ a ].domNode.classList.contains( 'Selected' ) )
 					{
 						found = true;
+						if( a == rw.length - 1 )
+						{
+							rw[ 0 ].domNode.click();
+							scroll = rw[ 0 ].domNode.offsetTop - 100;
+						}
+						else
+						{
+							rw[ a + 1 ].domNode.click();
+							scroll = rw[ a + 1 ].domNode.offsetTop - 100;
+						}
+						break;
 					}
 				}
-			}
-			if( out.length )
-			{
 				if( !found )
 				{
-					out[0].domNode.click();
-					return;
+					rw[ 0 ].domNode.click();
+					scroll = rw[ 0 ].domNode.offsetTop - 100;
 				}
-				for( var a = 0; a < out.length; a++ )
+				if( scroll )
 				{
-					if( out[a].selected && a < out.length - 1 )
+					window.regionWindow.directoryview.scroller.scrollTop = scroll;
+				}
+				return cancelBubble( e );
+			}
+			else
+			{
+				var out = [];
+				var found = false;
+				for( var a = 0; a < rw.length; a++ )
+				{
+					var f = rw[a].Title ? rw[a].Title : rw[a].Filename;
+					if( f.toUpperCase().charCodeAt(0) == k )
 					{
-						out[a+1].domNode.click();
-						return;
+						out.push( rw[a] );
+						if( rw[a].selected )
+						{
+							found = true;
+						}
 					}
 				}
-				out[0].domNode.click();
+				if( out.length )
+				{
+					if( !found )
+					{
+						out[0].domNode.click();
+						return;
+					}
+					for( var a = 0; a < out.length; a++ )
+					{
+						if( out[a].selected && a < out.length - 1 )
+						{
+							out[a+1].domNode.click();
+							return;
+						}
+					}
+					out[0].domNode.click();
+				}
 			}
 		}
 	}

@@ -1003,6 +1003,7 @@ function _ActivateWindow( div, nopoll, e )
 		div.windowObject.lastActiveView = null;
 		return;
 	}
+	
 	// Don't reactivate
 	if( div.classList.contains( 'Active' ) ) 
 	{
@@ -1012,6 +1013,13 @@ function _ActivateWindow( div, nopoll, e )
 				window.currentMovable = div;
 		}
 		return;
+	}
+	
+	if( isMobile )
+	{
+		window.focus();
+		if( Workspace.mainDock )
+			Workspace.mainDock.closeDesklet();
 	}
 	
 	// Blur previous window
@@ -1420,7 +1428,8 @@ function CloseView( win, delayed )
 			window.regionWindow = null;
 		if( window.currentMovable && window.currentMovable == win )
 			window.currentMovable = null;
-			
+		
+		if( !win.parentNode.parentNode ) return;
 		win.parentNode.parentNode.classList.add( 'Closing', 'NoEvents' );
 			
 		var count = 0;
