@@ -3810,12 +3810,21 @@ body .View.Active.IconWindow ::-webkit-scrollbar-thumb
 			if( !HasClass( window.currentMovable, 'Active' ) )
 				return false;
 
+			if( Workspace.newDir )
+				return Workspace.newDir.activate();
+			
 			var d = new View( {
 				id: 'makedir',
 				width: 325,
 				height: 100,
 				title: i18n( 'i18n_make_a_new_container' )
 			} );
+			
+			Workspace.newDir = d;
+			d.onClose = function()
+			{
+				Workspace.newDir = null;
+			}
 
 			d.setContent( '\
 			<div class="ContentFull">\
@@ -7167,8 +7176,6 @@ body .View.Active.IconWindow ::-webkit-scrollbar-thumb
 						// Actually do the delete
 						function doDeleteFiles( files, index )
 						{
-							console.log( 'To delete!' );
-						
 							// 
 							if( stop || index == files.length )
 							{
@@ -7201,7 +7208,6 @@ body .View.Active.IconWindow ::-webkit-scrollbar-thumb
 								info = info.substr( 0, info.length - 1 );
 								// Try to kill the info file!
 								file.door.dosAction( 'delete', { path: info + '.info' } );
-								console.log( 'Die info file: ' + info + '.info' );
 								
 							}
 							// Dormant?

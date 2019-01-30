@@ -1019,7 +1019,7 @@ DirectoryView.prototype.InitWindow = function( winobj )
 			var di = winobj;
 			
 			var info = false;
-			if( files && !di.content && di.classList.contains( 'Screen' ) || di.classList.contains( 'ScreenContent' ) )
+			if( files && !di.content && ( di.classList.contains( 'Screen' ) || di.classList.contains( 'ScreenContent' ) ) )
 			{
 				info = {
 					'session': Workspace.sessionId,
@@ -1028,19 +1028,27 @@ DirectoryView.prototype.InitWindow = function( winobj )
 					'files': files
 				};
 			}
-			else if( files && di.content && di.content.fileInfo && di.content.fileInfo.Volume )
+			else if( files && winobj.fileInfo && winobj.fileInfo.Volume )
 			{
 				info = {
 					'session': Workspace.sessionId,
-					'targetPath': di.content.fileInfo.Path,
-					'targetVolume': di.content.fileInfo.Volume,
+					'targetPath': winobj.fileInfo.Path,
+					'targetVolume': winobj.fileInfo.Volume,
 					'files': files
 				};
 			}
+			else
+			{
+				Notify( { title: 'Illegal upload target', text: 'Please upload to the desktop or a disk or folder.' } );
+				return;
+			}
+			
+			// Setup a file copying worker
+			var uworker = new Worker( 'js/io/filetransfer.js' );
 			
 			// Try recursion!
 			// TODO: Enable again when safe!!
-			if( 1 == 2 && e.dataTransfer.items )
+			if( e.dataTransfer.items )
 			{
 				info.files = [];
 				info.queued = true;
@@ -1084,14 +1092,18 @@ DirectoryView.prototype.InitWindow = function( winobj )
 					}
 				}
 
-				function renderItem( itm )
+				function sendItem( itm )
 				{
 					if( itm.file )
 					{
 						itm.file( function( f )
 						{
-							uworker.postMessage( { recursiveUpdate: true, item: f, fullPath: itm.fullPath, session: Workspace.sessionId } );
+							uworker.postMessage( { recursiveUpdate: true, item: f, fullPath: itm.fullPath, size: f.size, session: Workspace.sessionId } );
 						} );
+					}
+					else
+					{
+						uworker.postMessage( { recursiveUpdate: true, item: 'directory', fullPath: itm.fullPath, session: Workspace.sessionId } );
 					}
 					busyChecker();
 				}
@@ -1106,11 +1118,8 @@ DirectoryView.prototype.InitWindow = function( winobj )
 						{
 							dirReader.readEntries( function( results )
 							{
-								if( !results.length )
-								{
-									renderItem( entry );
-								}
-								else
+								sendItem( entry, 'directory' );
+								if( results.length )
 								{
 									for( var a = 0; a < results.length; a++ )
 									{
@@ -1123,7 +1132,7 @@ DirectoryView.prototype.InitWindow = function( winobj )
 					} 
 					else 
 					{
-						renderItem( entry, 1 );
+						sendItem( entry );
 					}
 				}
 
@@ -1138,11 +1147,8 @@ DirectoryView.prototype.InitWindow = function( winobj )
 						{
 							dirReader.readEntries( function( results )
 							{
-								if( !results.length )
-								{
-									renderItem( entry );
-								}
-								else
+								sendItem( entry, 'directory' );
+								if( results.length )
 								{
 									for( var a = 0; a < results.length; a++ )
 									{
@@ -1155,7 +1161,7 @@ DirectoryView.prototype.InitWindow = function( winobj )
 					} 
 					else 
 					{
-						renderItem( entry, 1 );
+						sendItem( entry );
 					}
 				}
 				countItems( e.dataTransfer.items );
@@ -1170,15 +1176,11 @@ DirectoryView.prototype.InitWindow = function( winobj )
 					return false;
 				}
 
-				// Setup a file copying worker
-				var uworker = new Worker( 'js/io/filetransfer.js' );
-
 				// Open window
 				var w = new View( {
 					title:  i18n( 'i18n_copying_files' ),
 					width:  320,
-					height: 100,
-					id:     'fileops'
+					height: 100
 				} );
 
 				var uprogress = new File( 'templates/file_operation.html' );
@@ -1476,9 +1478,6 @@ DirectoryView.prototype.doCopyOnElement = function( eles, e )
 	Workspace.diskNotification( [ winobj, eles[0].window ], 'refresh' );
 
 	// Sanitize input... no folder to be dropped into themselves or their children....
-	// HOGNE: Bug! If a window title contains the path of the icon to be dropped
-	// you close it (example: FriendBrowser showing index.html, and drag&drop of index.html)! :) 
-	// Maybe you should check if the window is a directoryView?
 	var clean = [];
 	for( var i = 0; i < eles.length; i++ )
 	{
@@ -1497,7 +1496,10 @@ DirectoryView.prototype.doCopyOnElement = function( eles, e )
 					('' + movableWindows[j].titleString ).indexOf( eles[i].window.fileInfo.Path + eles[i].Title ) != -1
 				)
 				{
-					movableWindows[j].windowObject.close();
+					if( movableWindows[ j ].content && movableWindows[ j ].content.directoryview )
+					{
+						movableWindows[j].windowObject.close();
+					}
 				}
 			}
 		}
