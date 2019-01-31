@@ -59,10 +59,10 @@
 #include <core/friendcore_manager.h>
 #include <openssl/crypto.h>
 
-#undef DEBUG
-#define DEBUG( ...)
-#undef DEBUG1
-#define DEBUG1( ...)
+//#undef DEBUG
+//#define DEBUG( ...)
+//#undef DEBUG1
+//#define DEBUG1( ...)
 
 //#define USE_PTHREAD
 #define USE_WORKERS
@@ -598,7 +598,7 @@ void *FriendCoreAcceptPhase2( void *d )
 							SocketClose( incoming );
 							goto accerror;
 						case SSL_ERROR_SYSCALL:
-							FERROR( "[SocketAcceptPair] Error syscall.\n" ); //. Goodbye! %s.\n", ERR_error_string( ERR_get_error(), NULL ) );
+							FERROR( "[SocketAcceptPair] Error syscall. Goodbye! %s.\n", ERR_error_string( ERR_get_error(), NULL ) );
 							SocketClose( incoming );
 							goto accerror;
 						case SSL_ERROR_SSL:
