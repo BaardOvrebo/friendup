@@ -3,6 +3,7 @@ var WorkspaceInside = {
 	trayIcons: {},
 	workspaceInside: true,
 	refreshDesktopIconsRetries: 0,
+	websocketDisconnectTime: 0,
 	serverIsThere: true, // Assume we have a server!
 	// Did we load the wallpaper?
 	wallpaperLoaded: false,
@@ -559,6 +560,7 @@ var WorkspaceInside = {
 				if( Workspace.screen ) Workspace.screen.hideOfflineMessage();
 				document.body.classList.remove( 'Offline' );
 				Workspace.workspaceIsDisconnected = false;
+				Workspace.websocketDisconnectTime = 0;
 				
 				// Reattach
 				if( !Workspace.conn && selfConn )
@@ -7159,12 +7161,13 @@ body .View.Active.IconWindow ::-webkit-scrollbar-thumb
 		{
 			var files = [];
 			var eles = w.getElementsByTagName( 'div' );
-			for( var a = 0; a < eles.length; a++ )
+			for( var a = 0; a < w.icons.length; a++ )
 			{
-				if( eles[a].classList.contains( 'Selected' ) )
+				if( w.icons[a].selected )
 				{
+					
 					var d = new Door();
-					files.push( { fileInfo: eles[a].fileInfo, door: d.get( eles[a].fileInfo.Path ) } );
+					files.push( { fileInfo: w.icons[a], door: d.get( w.icons[a].Path ) } );
 				}
 			}
 
@@ -7435,6 +7438,15 @@ body .View.Active.IconWindow ::-webkit-scrollbar-thumb
 			}
 			Workspace.serverIsThere = true;
 			Workspace.workspaceIsDisconnected = false;
+			
+			// If we have no conn, and we have waited five cycles, force reconnect
+			// the websocket...
+			if( !Workspace.conn && Workspace.websocketDisconnectTime++ > 5 )
+			{
+				Workspace.connectingWebsocket = false;
+				Workspace.websocketDisconnectTime = 0;
+				Workspace.initWebSocket();
+			}
 		}
 		// Only set serverIsThere if we don't have a response from the server
 		inactiveTimeout = setTimeout( function(){ Workspace.serverIsThere = false; }, 1000 );
@@ -7764,6 +7776,10 @@ body .View.Active.IconWindow ::-webkit-scrollbar-thumb
 			else if( e.data['error'] == 1 )
 			{
 				uprogress.displayError(e.data['errormessage']);
+			}
+			else
+			{
+				console.log('Unhandles messge from out filetransfer worker',e);
 			}
 
 		}

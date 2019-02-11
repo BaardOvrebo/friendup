@@ -1501,7 +1501,7 @@ if( isset( $args->command ) )
 				$out = [];
 				foreach( $users as $u )
 				{
-					$keys = [ 'ID', 'Name', 'Password', 'FullName', 'Email', 'CreatedTime', 'Level' ];
+					$keys = [ 'ID', 'Name', 'Password', 'FullName', 'Email', 'CreatedTime', 'Level', 'UniqueID' ];
 					$o = new stdClass();
 					foreach( $keys as $key )
 					{
@@ -1512,7 +1512,7 @@ if( isset( $args->command ) )
 				
 				if( isset( $args->args->count ) && $args->args->count )
 				{
-					$count = $SqlDatabase->FetchObject( 'SELECT COUNT( ID ) AS Num FROM FUser ' );
+					$count = $SqlDatabase->FetchObject( 'SELECT COUNT( DISTINCT( u.ID ) ) AS Num FROM FUser u, FUserToGroup tg WHERE u.ID = tg.UserID ' );
 					$out['Count'] = ( $count ? $count->Num : 0 );
 				}
 				

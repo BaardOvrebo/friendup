@@ -75,10 +75,15 @@ Friend.FileBrowser = function( initElement, flags, callbacks )
 		var t = e.target ? e.target : e.srcElement;
 		if( t == this )
 		{
-			self.setPath( self.rootPath, function()
+			var cb = function()
 			{
-				self.callbacks.folderOpen( self.rootPath );
-			} );
+				if( t )
+				{
+					self.callbacks.folderOpen( self.rootPath, e );
+				}
+				t = null;
+			};
+			self.setPath( self.rootPath, cb );
 		}
 		return cancelBubble( e );
 	}
@@ -223,7 +228,7 @@ Friend.FileBrowser.prototype.refresh = function( path, rootElement, callback, de
 				// Are we in a file dialog?
 				if( isMobile && ( self.flags.filedialog || self.flags.justPaths ) )
 				{
-					self.callbacks.folderOpen( ppath );
+					self.callbacks.folderOpen( ppath, e );
 					return  cancelBubble( e );
 				}
 				// Normal operation
@@ -236,7 +241,8 @@ Friend.FileBrowser.prototype.refresh = function( path, rootElement, callback, de
 						this.classList.add( 'Open' );
 						if( self.callbacks && self.callbacks.folderOpen )
 						{
-							self.callbacks.folderOpen( ppath );
+							self.callbacks.folderOpen( ppath, e );
+							cancelBubble( e );
 						}
 						var nam = ele.getElementsByClassName( 'Name' );
 						if( nam.length )
@@ -254,7 +260,8 @@ Friend.FileBrowser.prototype.refresh = function( path, rootElement, callback, de
 						nam[0].classList.remove( 'Open' );
 						if( self.callbacks && self.callbacks.folderClose )
 						{
-							self.callbacks.folderClose( ppath );
+							self.callbacks.folderClose( ppath, e );
+							cancelBubble( e );
 						}
 					}
 				}
@@ -425,7 +432,7 @@ Friend.FileBrowser.prototype.refresh = function( path, rootElement, callback, de
 						var nm = document.createElement( 'div' );
 						nm.style.paddingLeft = ( depth << 3 ) + 'px'; // * 8
 						nm.className = 'Name IconSmall IconDisk';
-						nm.innerHTML = ' ' + msg.list[a].Title;
+						nm.innerHTML = '<span> ' + msg.list[a].Title + '</span>';
 						
 						// We have an incoming path
 						if( !clickElement && self.flags.path && targetPath == d.path )
@@ -670,7 +677,7 @@ Friend.FileBrowser.prototype.refresh = function( path, rootElement, callback, de
 						var ext = msg.list[a].Filename.split( '.' ).pop().toLowerCase();
 						var icon = d.className == 'FolderItem' ? 'IconFolder' : ( 'IconFile ' + ext );
 						d.id = 'fileitem_' + msg.list[a].Filename.split( ' ' ).join( '' );
-						d.innerHTML = '<div style="padding-left: ' + ( d13 ) + 'px" class="Name IconSmall ' + icon + '"> ' + msg.list[a].Filename + '</div><div class="SubItems"></div>';
+						d.innerHTML = '<div style="padding-left: ' + ( d13 ) + 'px" class="Name IconSmall ' + icon + '"><span> ' + msg.list[a].Filename + '</span></div><div class="SubItems"></div>';
 						rootElement.appendChild( d );
 						var fn = msg.list[a].Filename;
 						if( msg.list[a].Type == 'Directory' )

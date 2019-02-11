@@ -575,7 +575,13 @@ DirectoryView.prototype.ShowFileBrowser = function()
 			self.bookmarks = d;
 			
 		// Go instantiate!
-		winobj.fileBrowser = new Friend.FileBrowser( d, { path: winobj.fileInfo.Path, displayFiles: false, justPaths: self.filedialog || self.hasSidebar, filedialog: self.filedialog }, {
+		winobj.fileBrowser = new Friend.FileBrowser( d, {
+			path: winobj.fileInfo.Path, 
+			displayFiles: false, 
+			justPaths: self.filedialog || self.hasSidebar, 
+			filedialog: self.filedialog 
+		}, 
+		{
 			checkFile( filepath, fileextension )
 			{
 				console.log( filepath + ' on ' + fileextension );
@@ -2749,8 +2755,12 @@ DirectoryView.prototype.SelectAll = function()
 		var ics = this.window.icons;
 		for( var a = 0; a < ics.length; a++ )
 		{
-			ics[a].domNode.classList.add( 'Selected' );
-			ics[a].domNode.selected = true;
+			if( ics[a].domNode )
+			{
+				ics[a].domNode.classList.add( 'Selected' );
+				ics[a].domNode.selected = true;
+			}
+			ics[a].selected = true;
 			if( ics[a].fileInfo )
 				ics[a].fileInfo.selected = true;
 		}
@@ -4286,8 +4296,13 @@ function RefreshWindowGauge( win, finfo )
 }
 
 // Opens a window based on the fileInfo (type etc) -----------------------------
-function OpenWindowByFileinfo( fileInfo, event, iconObject, unique )
+function OpenWindowByFileinfo( oFileInfo, event, iconObject, unique )
 {
+	// Make a copy of fileinfo
+	var fileInfo = {};
+	for( var a in oFileInfo )
+		fileInfo[ a ] = oFileInfo[ a ];
+
 	//console.log('OpenWindowByFileinfo fileInfo is ',fileInfo);
 	if( !iconObject )
 	{
